@@ -1,2 +1,12 @@
-# publications_cartrogram
+# Publications Cartograms
 Cartograms showin world scaled by number of documents published with authors from each country 
+
+This map was produced by Juan Pablo Alperin (Simon Fraser University) and Rodrigo Costas (Centre for Science and Technology Studies) as part of a larger research collaboration to study the production and readership by countries, and over time. Data about publications by country is sourced from Scopus and population and GDP data is sourced from the World Bank. The map is powered by [d3.js](http://d3js.org) using [cartogram.js](https://github.com/vasturiano/cartogram-chart) which itself relies on [this implementation](https://github.com/shawnbot/topogram) of Dougenik, Chrisman, Niemeyer ([1985](http://lambert.nico.free.fr/tp/biblio/Dougeniketal1985.pdf)).
+
+A 2016 edition of this map can be found [here](https://figshare.com/articles/World_scaled_by_number_of_documents_with_authors_from_each_country_in_Web_of_Science_2016/7064771) and a 2011 version, using data from Web of Science, is availble [here](https://figshare.com/articles/World_scaled_by_number_of_documents_in_Web_of_Science_2012_by_Authors_Living_There/953177%3E).
+
+Juan Pablo is an Assistant Professor in [Publishing](http://publishing.sfu.ca/), the Associate Director of Research for the [Public Knowledge Project](http://pkp.sfu.ca) and the co-Director of the [ScholCommLab](https://www.scholcommlab.ca) at Simon Fraser University. He can be reached on Twitter [\@juancommander](https://twitter.com/intent/follow?screen_name=juancommander) at over email at juan\@alperin.ca.
+
+Rodrigo Costas is a senior researcher at the [Centre for Science and Technology Studies](https://www.cwts.nl/) and an Extraordinary Associate Professor at the [Centre for Research on Evaluation, Science and Technology](http://www0.sun.ac.za/crest/) of Stellenbosch University (South Africa). He can be reached on Twitter at [\@RodrigoCostas1](https://twitter.com/intent/follow?screen_name=RodrigoCostas1) and over email at rcostas\@cwts.leidenuniv.nl.
+
+The code (including some of this page) was adapted from the example provided by [shawnbot](https://github.com/shawnbot/d3-cartogram/). The full source code for this page can be found in [Juan\'s github](https://github.com/jalperin/d3-cartogram).

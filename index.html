@@ -1,0 +1,380 @@
+<head>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/d3/4.11.0/d3.min.js"></script>
+    <script src="./colorbrewer.js"></script>
+    <script src="./cartogram-chart.js"></script>
+    <title>World scaled by number of documents with authors from each country</title>
+    <meta property="og:image" content="isi_articles_cartogram.png">
+    <style type="text/css">
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            padding: 0;
+            margin: 0;
+        }
+
+        #container {
+            width: 1200px;
+            margin: 20px auto;
+        }
+
+        h2 {
+            font-size: 160%;
+            margin: 0 0 10px 0;
+        }
+
+        p {
+            margin: 0 0 10px;
+        }
+
+        form, form > * {
+            margin: 0;
+        }
+
+        #map-container {
+            /*width: 800px;*/
+            height: 500px;
+            text-align: center;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        #map {
+            display: block;
+            position: absolute;
+            background: #fff;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            /*left: -250px;*/
+        }
+/*        #thecontrols {
+            background-color: white;
+            position: absolute;
+            top: 15px;
+            right: 0px;
+            padding: 5px;
+        }*/
+        #title {
+            font-size: 24px;
+            margin: 0 0 15px 0;
+            text-align: center;
+            margin-bottom: 0px;
+            font-weight: bold;
+        }
+
+        #thenormalizer {
+            line-height: 0.4em;
+            border: 1px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }       
+
+        select {
+            text-align: left;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            text-align: left;
+            border: 1px solid #CCC;
+            margin-bottom: 0px;            
+            height: 34px;
+/*            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;*/
+            min-width: 86pt;
+        }    
+
+
+        #about {
+            margin-left: 350px;
+            width: 600px;
+            font-size: .9em;
+        }
+
+        #credits {
+            position: absolute;
+            bottom: 25px;
+            right: 300px;
+            font-size: 1em;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+
+    <script>
+    var year,
+        min_year,
+        max_year;
+
+    var scopus_data, 
+        world,
+        scopus_map,
+        carto,
+        max_pubs,
+        max_year,
+        colors,
+        scale,
+        colorScale,
+        field_to_plot;
+
+
+    d3.queue()
+    .defer(d3.csv, "./scopus_articles_by_year_overall_pop_gdp_per_capita_gdp_total_2007_2017.csv")
+    .defer(d3.json, "./ne_110m_admin_0_countries.json")
+    .await(function(error, sd, w) {
+        if (error) {
+            console.error('Oh dear, something went wrong: ' + error);
+        }
+        else {
+            init(sd, w);
+        }
+    });
+
+    function init(sd, w) {
+        scopus_data = sd;
+        world = w;
+        // Convert pub_year and pubs (#) to int
+        // pubs,population_2017,gdp_2017_per_capita,gdp_2017_total
+
+        scopus_data.forEach(function(d){ 
+            d['country_iso2_code'] = d['country_iso2_code'].toUpperCase();
+            d['pubs'] = +d['pubs']; 
+            d['pub_year'] = +d['pub_year'];
+            d['population_2007'] = +d['population_2007'];
+            d['population_2017'] = +d['population_2017'];
+            d['gdp_2007_total'] = +d['gdp_2007_total'];
+            d['gdp_2017_total'] = +d['gdp_2017_total'];
+
+            // if (d['population_2017'] > 0 ) {
+            //     d['pubs_per_population'] = Math.round(d['pubs']/(d['population_2017']/1000000));
+            // } else {
+            //     d['pubs_per_population'] = 0;
+            // }
+
+            // if (d['gdp_2017_total'] > 0 ) {
+            //     d['pubs_per_gdp'] = Math.round(d['pubs']/(d['gdp_2017_total']/1000000000));
+            // } else {
+            //     d['pubs_per_gdp'] = 0;
+            // }
+
+            d['pubs_per_population_2007'] = +d['pubs_per_population_2007'];
+            d['pubs_per_population_2017'] = +d['pubs_per_population_2017'];
+            d['pubs_per_gdp_2007'] = +d['pubs_per_gdp_2007'];
+            d['pubs_per_gdp_2017'] = +d['pubs_per_gdp_2017'];
+
+        });
+
+        min_year = d3.min(scopus_data, function(d) { return d.pub_year; });
+        max_year = d3.max(scopus_data, function(d) { return d.pub_year; });
+
+        // Using nest to reshape to a list of keys
+        // then loop through them and make a map with years as keys
+        scopus_map = {};
+        d3.nest()
+            .key(function(d) { return +d.pub_year; })
+            .key(function(d) { return d.country_iso2_code; })
+            .entries(scopus_data)
+                .forEach(function(y) { 
+                    var countries = {}
+                    y.values.forEach(function(x) {
+                        countries[x.key] = x.values[0];
+                    });
+                    return scopus_map[+y.key] = countries;
+                });   
+
+        // exclude antarctica
+        world.objects.countries.geometries.splice(
+            world.objects.countries.geometries.findIndex(d => d.properties.ISO_A2 === 'AQ'),
+            1
+        );
+
+        colors = colorbrewer.YlOrRd[7]
+            // .reverse()
+            .map(function(rgb) { return d3.hsl(rgb); });
+
+        // var num_docs = d3.values(scopus_map);            
+        colorScale = d3.scaleQuantize()
+            .range(colors)
+            .domain([1, 1000]);
+
+
+        // set the start year
+        year = 2017;
+        // d3.select("input[type=range]").property('value', year);
+        // d3.select("#theyear > span").html(year);
+        // d3.select("#theyear > span").on("click", 
+        //     function() {
+        //         // d3.select("#theyear > select").classed("inputHide", false);
+        //     });
+        d3.select("#theyear > select").on("change", function() { 
+            console.log("changed");
+            year = this.value; 
+            update(); 
+            // d3.select("#theyear > select").classed("inputHide", true);
+            // this.style.display = "none";
+        });
+        // d3.select("input[type=range]").on("click", function() { clearInterval(intervalId); });
+
+        d3.select("#thenormalizer > select").on("change", function() { field_to_plot = this.value; update(); });
+
+        carto = Cartogram()
+            .topoJson(world)
+            .projection(d3.geoEquirectangular().scale(200).translate([580, 300]))
+            .topoObjectName('countries')
+            .iterations(20)
+            // .value(getPublications)
+            // ({ properties }) => wos_map[properties.ISO_A2])
+            .color(function(f) { 
+                return colorScale(getPublications(f));
+            })
+            // .label(function(feature) {
+            //     p = feature.properties; 
+            //     val = d3.max([1, scopus_map[p.ISO_A2]]);
+            //     return `Number of articles ${val} (${p.ISO_A2})`;
+            // })
+            .width(1200)
+            .height(500)
+            // .onClick(update)
+            // .onClick(d => console.info(d));
+            (document.getElementById('map'));
+
+        field_to_plot = 'pubs';
+        update();
+    }
+
+    function getPublications({ properties: p }) {
+        try {
+            return scale(scopus_map[year][p.ISO_A2][field_to_plot]);
+        }
+        catch(e) {
+            return 1;
+        }
+    }
+
+    function update() {
+        max_pubs = d3.max(scopus_data, function(d) { return d[field_to_plot]; });
+
+        // normalize the scale to positive numbers
+        scale = d3.scaleLinear()
+                .domain([0, max_pubs])
+                .range([1, 1000]); 
+
+        // filterByCurrentYear();
+        carto
+            .value(getPublications)
+            .label(function(feature) {
+                p = feature.properties; 
+                val = d3.max([0, scopus_map[year][p.ISO_A2][field_to_plot]]);
+                val = d3.format(",")(val);
+                return `${p.ADMIN}<br>${field_to_plot}: ${val}`;})
+            .valFormatter(() => ''); 
+
+        // d3.select("#theyear > span").html(year);
+
+        updateLegend();
+
+    }
+
+    function updateLegend() {
+        var legend_top = 350;
+        var legend_left = 100;
+
+        d3.select('svg').selectAll('g.legendEntry').remove();
+        var legend = d3.select('svg').selectAll('g.legendEntry')
+            .data(colorScale.range().reverse())
+            .enter()
+            .append('g').attr('class', 'legendEntry');
+
+        legend
+            .append('rect')
+            .attr("x", legend_left)
+            .attr("y", function(d, i) {
+               return legend_top + (i * 20);
+            })
+           .attr("width", 10)
+           .attr("height", 10)
+           .style("stroke", "black")
+           .style("stroke-width", 1)
+           .style("fill", function(d){return d;}); 
+               //the data objects are the fill colors
+
+        legend
+            .append('text')
+            .attr("x", legend_left + 20) //leave 5 pixel space after the <rect>
+            .attr("y", function(d, i) {
+               return legend_top + (i * 20);
+            })
+            .attr("dy", "0.8em") //place text one line *below* the x,y point
+            .text(function(d,i) {
+                var extent = colorScale.invertExtent(d);
+
+                //extent will be a two-element array, format it however you want:
+                f = (+extent[0] == 1) ? 0 : +extent[0]*max_pubs/1000;
+                l = +extent[1]*max_pubs/1000;                
+
+                if (max_pubs < 1000) {
+                    var format = d3.format(",.3r");
+                } else if (max_pubs < 10000) {
+                    var format = d3.format(",.4r");
+                } else {
+                    var format = d3.format(",.0f");
+                    f = f/1000;
+                    l = l/1000;
+                }
+                return format(f) + " - " + format(l);
+            });
+    }
+    </script>
+
+    <div id="title">World scaled by number of documents published in
+        <span id="theyear">
+            <!-- <span style="display: none;"></span> -->
+            <select name="yearSelect">
+                <option value="1997">1997 </option>
+                <option value="2007">2007</option>
+                <option selected value="2017">2017</option>
+            </select>
+        </span>
+    </div>
+        <div id="thenormalizer">with authors from each country 
+            <select name="normalize">
+                <option value="pubs" selected>(publications counted once per country)</option>
+                <option value="pubs_per_population_2007">as a proportion of the population in 2007</option>
+                <option value="pubs_per_population_2017">as a proportion of the population in 2017</option>
+                <option value="pubs_per_gdp_2007">as a proportion of the GDP in 2007</option>
+                <option value="pubs_per_gdp_2017">as a proportion of the GDP in 2017</option>
+            </select> 
+        </div>
+
+
+    <div id="map-container">
+        <!-- <img id="placeholder" alt="placeholder image for old browsers" src="isi_articles_cartogram.png"> -->
+        <div id="map"></div>
+        <div id="thecontrols">
+        </div>
+        <div id="credits"><img src="./scholcommlab.png" height="30px" align="left"/><br /><br />
+            CC-BY J.P. Alperin & Costas, R.<br/>
+            <a href="https://twitter.com/intent/follow?screen_name=juancommander">@juancommander</a> & <a href="https://twitter.com/intent/follow?screen_name=RodrigoCostas1">@RodrigoCostas1</a></div>
+    </div>
+
+    <div id="about">
+        <h2>About</h2>
+        <p>
+            This map was produced by Juan Pablo Alperin (Simon Fraser University) and Rodrigo Costas (Centre for Science and Technology Studies) as part of a larger research collaboration to study the production and readership by countries, and over time. Data about publications by country is sourced from Scopus and population and GDP data is sourced from the World Bank. The map is powered by <a href="http://d3js.org">d3.js</a> using <a href="https://github.com/vasturiano/cartogram-chart">cartogram.js</a> which itself relies on <a href="https://github.com/shawnbot/topogram">this implementation</a> of Dougenik, Chrisman, Niemeyer (<a href="http://lambert.nico.free.fr/tp/biblio/Dougeniketal1985.pdf">1985</a>). 
+        </p>
+        <p>A 2016 edition of this map can be found <a href="https://figshare.com/articles/World_scaled_by_number_of_documents_with_authors_from_each_country_in_Web_of_Science_2016/7064771">here</a> and a 2011 version, using data from Web of Science, is availble <a href="https://figshare.com/articles/World_scaled_by_number_of_documents_in_Web_of_Science_2012_by_Authors_Living_There/953177>">here</a>.
+        </p>
+        <p>
+            Juan Pablo is an Assistant Professor in <a href="http://publishing.sfu.ca/">Publishing</a>, the Associate Director of Research for the <a href="http://pkp.sfu.ca">Public Knowledge Project</a> and the co-Director of the <a href="https://www.scholcommlab.ca">ScholCommLab</a> at Simon Fraser University. He can be reached on Twitter <a href="https://twitter.com/intent/follow?screen_name=juancommander">@juancommander</a> at over email at juan@alperin.ca.
+        </p>
+        <p>
+            Rodrigo Costas  is a senior researcher at the <a href="https://www.cwts.nl/">Centre for Science and Technology Studies</a> and an Extraordinary Associate Professor at the <a href="http://www0.sun.ac.za/crest/">Centre for Research on Evaluation, Science and Technology</a> of Stellenbosch University (South Africa). He can be reached on Twitter at <a href="https://twitter.com/intent/follow?screen_name=RodrigoCostas1">@RodrigoCostas1</a> and over email at rcostas@cwts.leidenuniv.nl. 
+        <p>
+            The code (including some of this page) was adapted from the example provided by <a href="https://github.com/shawnbot/d3-cartogram/">shawnbot</a>. The full source code for this page can be found in <a href="https://github.com/jalperin/publications_cartrogram">Juan's github</a>.
+        </p>    
+    </div>
+</body>
